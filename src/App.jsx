@@ -30,7 +30,7 @@ const dataPolygon = [
 const App = () => {
     const { isLoaded, loadError } = useLoadScript({
         id: 'google-map-script',
-        googleMapsApiKey: 'AIzaSyDne15rkAQpevqh3d40eXn_Zw28aUmuPzY',
+        googleMapsApiKey: import.meta.env.VITE_GOOGLE_API_KEY,
         libraries,
     });
 
