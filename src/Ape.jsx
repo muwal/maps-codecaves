@@ -10,7 +10,10 @@ const placeName = [
     "Tojo Una-Una",
     "Morowali, Central Sulawesi, Sulawesi, 94973, Indonesia",
     "Morowali Utara, Central Sulawesi, Sulawesi, 94971, Indonesia",
-    "Kabupaten Morowali Utara, Sulawesi Tengah, Indonesia",
+    "Luwu Timur, South Sulawesi, Sulawesi, 92981, Indonesia",
+    "Konawe",
+    "Konawe Utara",
+    "Kolaka Utara"
 ];
 
 function MyMap() {
@@ -45,21 +48,21 @@ function MyMap() {
                     const response = result.value.data;
 
                     if (response.length > 0) {
-                        const geojsonPolygon = response[0].geojson;
+                        const geojsonPolygon = response.find(item =>
+                            item.geojson && (item.geojson.type === 'Polygon' || item.geojson.type === 'MultiPolygon')
+                        )?.geojson;
 
-                        if (geojsonPolygon && (geojsonPolygon.type === 'Polygon' || geojsonPolygon.type === 'MultiPolygon')) {
+                        if (geojsonPolygon) {
                             const coordinates = geojsonPolygon.type === 'Polygon'
                                 ? [geojsonPolygon.coordinates[0]]
                                 : geojsonPolygon.coordinates.map(polygon => polygon[0]);
 
                             coordinates.forEach(coord => {
                                 allPolygons.push(coord);
-                                allPlacesName.push(response[0].display_name || placeName[index]);
-                                allBounds.push(response[0].boundingbox);
+                                allPlacesName.push(response.find(item => item.geojson === geojsonPolygon).display_name || placeName[index]);
+                                allBounds.push(response.find(item => item.geojson === geojsonPolygon).boundingbox);
                             });
                         }
-
-                        console.info(response);
                     } else {
                         console.warn(`Place not found: ${placeName[index]}`);
                     }
