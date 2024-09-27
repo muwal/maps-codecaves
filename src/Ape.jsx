@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Polygon, Popup, useMapEvent } from 'react-leaflet';
 import axios from 'axios';
 
@@ -10,15 +10,16 @@ const placeName = [
     "Tojo Una-Una",
     "Morowali, Central Sulawesi, Sulawesi, 94973, Indonesia",
     "Morowali Utara, Central Sulawesi, Sulawesi, 94971, Indonesia",
+    "Kabupaten Morowali Utara, Sulawesi Tengah, Indonesia",
 ];
 
 function MyMap() {
     const [coordinatess, setCoordinatess] = useState([]);
     const [placeNames, setPlaceNames] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [hovered, setHovered] = useState({}); // Track hovered state per polygon
+    // Removed hovered state as it is not used
     const [clicked, setClicked] = useState(null);
-    const [centerBounds, setCenterBounds] = useState(null);
+    const [centerBounds, setCenterBounds] = useState([]);
 
     const fetchCoordinatesBoundaries = async () => {
         try {
@@ -29,9 +30,6 @@ function MyMap() {
                         format: 'json',
                         polygon_geojson: 1,
                         limit: 10
-                    },
-                    headers: {
-                        'Acess-Control-Allow-Origin': 'http://localhost:3000',
                     }
                 })
             );
@@ -43,15 +41,12 @@ function MyMap() {
             const allBounds = [];
 
             responses.forEach((result, index) => {
-                console.log(result)
                 if (result.status === 'fulfilled') {
                     const response = result.value.data;
 
-                    // Check if data exists
                     if (response.length > 0) {
                         const geojsonPolygon = response[0].geojson;
 
-                        // Process Polygon and MultiPolygon
                         if (geojsonPolygon && (geojsonPolygon.type === 'Polygon' || geojsonPolygon.type === 'MultiPolygon')) {
                             const coordinates = geojsonPolygon.type === 'Polygon'
                                 ? [geojsonPolygon.coordinates[0]]
@@ -60,54 +55,25 @@ function MyMap() {
                             coordinates.forEach(coord => {
                                 allPolygons.push(coord);
                                 allPlacesName.push(response[0].display_name || placeName[index]);
+                                allBounds.push(response[0].boundingbox);
                             });
-                            allBounds.push(response[0].boundingbox)
                         }
+
+                        console.info(response);
                     } else {
-                        console.log(`Place not found: ${placeName[index]}`);
+                        console.warn(`Place not found: ${placeName[index]}`);
                     }
                 } else {
                     console.error(`Failed to fetch data for: ${placeName[index]}`, result.reason);
                 }
             });
 
-            // // Loop through all place names and fetch their boundary data
-            // for (let place of placeName) {
-            //     const response = await axios.get(`https://nominatim.openstreetmap.org/search`, {
-            //         params: {
-            //             q: place,
-            //             format: 'json',
-            //             polygon_geojson: 1
-            //         }
-            //     });
+            const bounds = allBounds.map(bound => [
+                [parseFloat(bound[0]), parseFloat(bound[2])],
+                [parseFloat(bound[1]), parseFloat(bound[3])]
+            ]);
 
-            //     if (response.data.length > 0) {
-            //         const geojsonPolygon = response.data[0].geojson;
-            //         console.log(response.data);
-
-            //         // Check if the response is valid and contains Polygon data
-            //         if (geojsonPolygon && geojsonPolygon.type === 'Polygon') {
-            //             const mainPolygon = geojsonPolygon.coordinates[0] || [];
-            //             const placesNames = response.data[0].name || place;
-
-            //             allPolygons.push(mainPolygon); // Add the polygon to the list
-            //             allPlacesName.push(placesNames);
-            //         } else if (geojsonPolygon && geojsonPolygon.type === 'MultiPolygon') {
-            //             geojsonPolygon.coordinates.forEach(
-            //                 polygon => {
-            //                     allPolygons.push(polygon[0])
-            //                     allPlacesName.push(place);
-            //                 }
-            //             ); // Handle MultiPolygon type
-            //         }
-            //     } else {
-            //         console.log(`Place not found: ${place}`);
-            //     }
-            // }
-
-
-            // console.log(allBounds)
-            setCenterBounds(allBounds)
+            setCenterBounds(bounds);
             setCoordinatess(allPolygons); // Store all polygons
             setPlaceNames(allPlacesName);
             setLoading(false); // Set loading to false once all data is fetched
@@ -121,36 +87,13 @@ function MyMap() {
     // Fetch coordinates for each place in the placeName array
     useEffect(() => {
         if (placeName.length > 0) {
-            fetchCoordinatesBoundaries(setCoordinatess, setPlaceNames, setClicked).then(() => setLoading(false));
+            fetchCoordinatesBoundaries().then(() => setLoading(false));
         }
     }, []);
-
-    // Create a bounding box for all polygons
-    // function getBounds(coordinatess) {
-    //     const lats = [];
-    //     const lngs = [];
-
-    //     coordinatess.forEach(polygon => {
-    //         polygon.forEach(coord => {
-    //             lats.push(coord[1]); // Latitude (index 1)
-    //             lngs.push(coord[0]); // Longitude (index 0)
-    //         });
-    //     });
-
-    //     const southWest = [Math.min(...lats), Math.min(...lngs)];
-    //     const northEast = [Math.max(...lats), Math.max(...lngs)];
-
-    //     // console.log('Bounds:', [southWest, northEast]);
-
-    //     return [southWest, northEast];
-    // }
 
     if (loading) {
         return <div>Loading...</div>;
     }
-
-    // Get bounds from the fetched coordinates
-    // const bounds = getBounds(coordinatess);
 
     const MapClickHandler = () => {
         useMapEvent({
@@ -159,11 +102,13 @@ function MyMap() {
             }
         });
         return null;
-    };
+    }
+
 
     return (
         <MapContainer
-            bounds={centerBounds}
+            bounds={centerBounds.length > 0 ? centerBounds : undefined}
+            // bounds={centerBounds}
             zoom={12}
             style={{ height: "600px", width: "100%" }}
         >
@@ -185,14 +130,7 @@ function MyMap() {
 
                     eventHandlers={{
                         click: () => {
-                            // setClicked(prev => ({ ...prev, [index]: !prev[index] })); // Toggle clicked state for this polygon
                             setClicked(index);
-                        },
-                        mouseover: () => {
-                            setHovered(prev => ({ ...prev, [index]: true })); // Set hovered state for this polygon
-                        },
-                        mouseout: () => {
-                            setHovered(prev => ({ ...prev, [index]: false })); // Remove hovered state for this polygon
                         },
                     }}
                 >
