@@ -9,7 +9,7 @@ const placeName = [
     "Banggai Laut",
     "Tojo Una-Una",
     "Morowali, Central Sulawesi, Sulawesi, 94973, Indonesia",
-    "Morowali Utara, Central Sulawesi, Sulawesi, 94971, Indonesia"
+    "Morowali Utara, Central Sulawesi, Sulawesi, 94971, Indonesia",
 ];
 
 function MyMap() {
@@ -17,7 +17,8 @@ function MyMap() {
     const [placeNames, setPlaceNames] = useState([]);
     const [loading, setLoading] = useState(true);
     const [hovered, setHovered] = useState({}); // Track hovered state per polygon
-    const [clicked, setClicked] = useState();
+    const [clicked, setClicked] = useState(null);
+    const [centerBounds, setCenterBounds] = useState(null);
 
     const fetchCoordinatesBoundaries = async () => {
         try {
@@ -27,7 +28,11 @@ function MyMap() {
                         q: place,
                         format: 'json',
                         polygon_geojson: 1,
+                        limit: 10
                     },
+                    headers: {
+                        'Acess-Control-Allow-Origin': 'http://localhost:3000',
+                    }
                 })
             );
 
@@ -35,10 +40,11 @@ function MyMap() {
 
             const allPolygons = [];
             const allPlacesName = [];
+            const allBounds = [];
 
             responses.forEach((result, index) => {
                 console.log(result)
-                if (result.status === 'fulfilled' || result.value.status === 200) {
+                if (result.status === 'fulfilled') {
                     const response = result.value.data;
 
                     // Check if data exists
@@ -55,6 +61,7 @@ function MyMap() {
                                 allPolygons.push(coord);
                                 allPlacesName.push(response[0].display_name || placeName[index]);
                             });
+                            allBounds.push(response[0].boundingbox)
                         }
                     } else {
                         console.log(`Place not found: ${placeName[index]}`);
@@ -98,6 +105,9 @@ function MyMap() {
             //     }
             // }
 
+
+            // console.log(allBounds)
+            setCenterBounds(allBounds)
             setCoordinatess(allPolygons); // Store all polygons
             setPlaceNames(allPlacesName);
             setLoading(false); // Set loading to false once all data is fetched
@@ -111,34 +121,36 @@ function MyMap() {
     // Fetch coordinates for each place in the placeName array
     useEffect(() => {
         if (placeName.length > 0) {
-            fetchCoordinatesBoundaries();
+            fetchCoordinatesBoundaries(setCoordinatess, setPlaceNames, setClicked).then(() => setLoading(false));
         }
-    }, [placeName]);
+    }, []);
 
     // Create a bounding box for all polygons
-    function getBounds(coordinatess) {
-        const lats = [];
-        const lngs = [];
+    // function getBounds(coordinatess) {
+    //     const lats = [];
+    //     const lngs = [];
 
-        coordinatess.forEach(polygon => {
-            polygon.forEach(coord => {
-                lats.push(coord[1]); // Latitude (index 1)
-                lngs.push(coord[0]); // Longitude (index 0)
-            });
-        });
+    //     coordinatess.forEach(polygon => {
+    //         polygon.forEach(coord => {
+    //             lats.push(coord[1]); // Latitude (index 1)
+    //             lngs.push(coord[0]); // Longitude (index 0)
+    //         });
+    //     });
 
-        const southWest = [Math.min(...lats), Math.min(...lngs)];
-        const northEast = [Math.max(...lats), Math.max(...lngs)];
+    //     const southWest = [Math.min(...lats), Math.min(...lngs)];
+    //     const northEast = [Math.max(...lats), Math.max(...lngs)];
 
-        return [southWest, northEast];
-    }
+    //     // console.log('Bounds:', [southWest, northEast]);
+
+    //     return [southWest, northEast];
+    // }
 
     if (loading) {
         return <div>Loading...</div>;
     }
 
     // Get bounds from the fetched coordinates
-    const bounds = getBounds(coordinatess);
+    // const bounds = getBounds(coordinatess);
 
     const MapClickHandler = () => {
         useMapEvent({
@@ -151,8 +163,8 @@ function MyMap() {
 
     return (
         <MapContainer
-            bounds={bounds}
-            zoom={10}
+            bounds={centerBounds}
+            zoom={12}
             style={{ height: "600px", width: "100%" }}
         >
             <TileLayer
